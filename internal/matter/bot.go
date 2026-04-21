@@ -160,13 +160,32 @@ func (b *Bot) SetTemperature(ctx context.Context, entityID string, temp float64)
 	})
 }
 
-// GetState returns the current state of an entity.
-func (b *Bot) GetState(entityID string) (Entity, bool) {
+// GetDevices returns all watched Matter devices as map[string]interface{} (gateway.MatterProvider).
+func (b *Bot) GetDevices() map[string]interface{} {
+	devices := b.getDevicesInternal()
+	result := make(map[string]interface{}, len(devices))
+	for k, v := range devices {
+		result[k] = v
+	}
+	return result
+}
+
+// GetState returns a single entity as interface{} (gateway.MatterProvider).
+func (b *Bot) GetState(entityID string) (interface{}, bool) {
+	e, ok := b.client.GetEntity(entityID)
+	if !ok {
+		return nil, false
+	}
+	return e, true
+}
+
+// GetStateTyped returns the cached typed state of an entity.
+func (b *Bot) GetStateTyped(entityID string) (Entity, bool) {
 	return b.client.GetEntity(entityID)
 }
 
-// GetDevices returns all watched Matter devices and their states.
-func (b *Bot) GetDevices() map[string]Entity {
+// getDevicesInternal returns all watched Matter devices with typed state.
+func (b *Bot) getDevicesInternal() map[string]Entity {
 	all := b.client.AllEntities()
 	result := make(map[string]Entity)
 	for id, e := range all {

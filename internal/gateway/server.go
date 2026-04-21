@@ -19,9 +19,16 @@ type Server struct {
 	registry   *agent.Registry
 	runners    map[string]*agent.Runner
 	dispatcher *orchestrator.Dispatcher
+	matterBot  MatterProvider
 
 	httpSrv *http.Server
 	ln      net.Listener
+}
+
+// MatterProvider is implemented by *matter.Bot to expose device state to the gateway.
+type MatterProvider interface {
+	GetDevices() map[string]interface{}
+	GetState(entityID string) (interface{}, bool)
 }
 
 func NewServer(socketPath string, reg *agent.Registry, runners map[string]*agent.Runner, d *orchestrator.Dispatcher) *Server {
@@ -31,6 +38,11 @@ func NewServer(socketPath string, reg *agent.Registry, runners map[string]*agent
 		runners:    runners,
 		dispatcher: d,
 	}
+}
+
+// SetMatterBot sets the Matter channel bot for device state queries.
+func (s *Server) SetMatterBot(bot MatterProvider) {
+	s.matterBot = bot
 }
 
 func (s *Server) Start(ctx context.Context) error {

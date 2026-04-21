@@ -36,6 +36,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/agents/stop", s.handleAgentStop)
 	mux.HandleFunc("/tasks", s.handleTasks)
 	mux.HandleFunc("/tasks/", s.handleTaskByID)
+	mux.HandleFunc("/matter", s.handleMatterDevices)
+	mux.HandleFunc("/matter/", s.handleMatterDevice)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -155,4 +157,39 @@ func (s *Server) handleTaskByID(w http.ResponseWriter, r *http.Request) {
 		Result: task.Result,
 		Error:  task.Error,
 	})
+}
+
+func (s *Server) handleMatterDevices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.matterBot == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"connected": false, "devices": []any{}})
+		return
+	}
+	devices := s.matterBot.GetDevices()
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "devices": devices})
+}
+
+func (s *Server) handleMatterDevice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	entityID := strings.TrimPrefix(r.URL.Path, "/matter/")
+	if entityID == "" {
+		writeError(w, http.StatusBadRequest, "entity id required")
+		return
+	}
+	if s.matterBot == nil {
+		writeError(w, http.StatusServiceUnavailable, "matter not configured")
+		return
+	}
+	entity, ok := s.matterBot.GetState(entityID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "entity not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, entity)
 }

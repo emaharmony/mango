@@ -168,11 +168,14 @@ func runServe(parent context.Context, cfg *Config) error {
 			return fmt.Errorf("matter start: %w", err)
 		}
 
-		// Register Matter as an agent tool
+	// Register Matter as an agent tool
 		matterTool := matter.NewTool(matterBot)
 		if err := toolReg.Register(matterTool); err != nil {
 			return fmt.Errorf("register matter tool: %w", err)
 		}
+
+		// Wire Matter into gateway for /matter endpoints
+		gw.SetMatterBot(matterBot)
 
 		defer func() {
 			if err := matterBot.Close(); err != nil {

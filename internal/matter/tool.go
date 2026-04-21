@@ -122,15 +122,21 @@ func (t *Tool) Execute(ctx context.Context, input string) (string, error) {
 
 // listDevices returns a formatted list of all watched Matter devices.
 func (t *Tool) listDevices() (string, error) {
-	devices := t.bot.GetDevices()
-	if len(devices) == 0 {
+	devicesRaw := t.bot.GetDevices()
+	if len(devicesRaw) == 0 {
 		return "No Matter devices found.", nil
 	}
 
+	// Convert to typed for display
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("🏠 %d Matter devices:\n\n", len(devices)))
+	sb.WriteString(fmt.Sprintf("🏠 %d Matter devices:\n\n", len(devicesRaw)))
 
-	for id, entity := range devices {
+	for id, raw := range devicesRaw {
+		entity, ok := raw.(Entity)
+		if !ok {
+			sb.WriteString(fmt.Sprintf("- **%s**: (unknown type)\n", id))
+			continue
+		}
 		friendlyName := ""
 		if name, ok := entity.Attributes["friendly_name"].(string); ok {
 			friendlyName = name
@@ -143,9 +149,13 @@ func (t *Tool) listDevices() (string, error) {
 
 // getDeviceState returns the state of a specific device.
 func (t *Tool) getDeviceState(entityID string) (string, error) {
-	entity, ok := t.bot.GetState(entityID)
+	entityRaw, ok := t.bot.GetState(entityID)
 	if !ok {
 		return "", fmt.Errorf("entity %s not found", entityID)
+	}
+	entity, ok := entityRaw.(Entity)
+	if !ok {
+		return "", fmt.Errorf("entity %s has unexpected type", entityID)
 	}
 
 	friendlyName := ""
