@@ -1,0 +1,29 @@
+# Mango Configuration — Ported from OpenClaw
+# See config.example.yaml for all options
+
+agents:
+  - name: orchestrator
+    role: orchestrator
+    llm:
+      provider: ollama
+      model: qwen3.5:cloud
+      base_url: http://localhost:11434/v1
+
+  - name: worker
+    skills: [weather, github]
+    llm:
+      provider: ollama
+      model: qwen3.5:cloud
+      base_url: http://localhost:11434/v1
+
+  - name: jirby
+    skills: [empathy, project-management, adhd-aware]
+    llm:
+      provider: ollama
+      model: qwen3.5:cloud
+      base_url: http://localhost:11434/v1
+
+# Discord integration — requires a SEPARATE bot token from OpenClaw's bot
+# Create a new Discord app at https://discord.com/developers/applications
+# discord:
+#   token: "YOUR_MANGO_DISCORD_BOT_TOKEN"
