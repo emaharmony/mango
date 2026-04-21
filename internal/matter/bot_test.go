@@ -2,9 +2,6 @@ package matter
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
@@ -50,84 +47,30 @@ func TestIsWatched(t *testing.T) {
 	}
 }
 
-func TestMatterToolList(t *testing.T) {
-	bot := &Bot{
-		client: &HomeAssistantClient{
-			_states: map[string]Entity{
-				"light.living_room": {EntityID: "light.living_room", State: "on", Attributes: map[string]interface{}{"friendly_name": "Living Room Light"}},
-				"switch.kitchen":    {EntityID: "switch.kitchen", State: "off", Attributes: map[string]interface{}{"friendly_name": "Kitchen Switch"}},
-			},
-		},
-		entityFilters: []string{"light", "switch"},
+func TestControllerConfigDefaults(t *testing.T) {
+	ctrl := NewController(ControllerConfig{})
+	if ctrl.cfg.NodePath != "node" {
+		t.Errorf("expected default NodePath 'node', got %q", ctrl.cfg.NodePath)
 	}
-	tool := NewTool(bot)
-	result, err := tool.Execute(context.Background(), "list")
-	if err != nil {
-		t.Fatalf("Execute list: %v", err)
-	}
-	if !strings.Contains(result, "light.living_room") {
-		t.Errorf("list result missing light.living_room: %s", result)
-	}
-	if !strings.Contains(result, "2 Matter devices") {
-		t.Errorf("list result missing device count: %s", result)
+	if ctrl.cfg.Port != 5540 {
+		t.Errorf("expected default Port 5540, got %d", ctrl.cfg.Port)
 	}
 }
 
-func TestMatterToolState(t *testing.T) {
-	bot := &Bot{
-		client: &HomeAssistantClient{
-			_states: map[string]Entity{
-				"light.living_room": {EntityID: "light.living_room", State: "on", Attributes: map[string]interface{}{
-					"friendly_name": "Living Room Light",
-					"brightness":    255,
-				}},
-			},
-		},
-		entityFilters: []string{"light"},
-	}
-	tool := NewTool(bot)
-	result, err := tool.Execute(context.Background(), "state light.living_room")
-	if err != nil {
-		t.Fatalf("Execute state: %v", err)
-	}
-	if !strings.Contains(result, "on") {
-		t.Errorf("state result missing 'on': %s", result)
-	}
-	if !strings.Contains(result, "brightness") {
-		t.Errorf("state result missing brightness: %s", result)
+func TestControllerIsRunning(t *testing.T) {
+	ctrl := NewController(ControllerConfig{StorageDir: t.TempDir()})
+	if ctrl.IsRunning() {
+		t.Error("expected controller not running before Start()")
 	}
 }
 
-func TestMatterToolUnknownCommand(t *testing.T) {
-	bot := &Bot{
-		client: &HomeAssistantClient{_states: map[string]Entity{}},
-		entityFilters: []string{"light"},
-	}
-	tool := NewTool(bot)
-	_, err := tool.Execute(context.Background(), "explode light.living_room")
-	if err == nil {
-		t.Error("expected error for unknown command")
-	}
+func TestFindControllerScript(t *testing.T) {
+	// This test just ensures the function doesn't panic
+	// In CI/test env, there's no script file, so it returns ""
+	result := findControllerScript()
+	_ = result // may be empty in test env
 }
 
-// Mock HA server for integration-style tests
-func TestHAClientAuth(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/websocket" {
-			// Upgrade to websocket would require a real ws server
-			// For now, test the auth message construction
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	}))
-	defer server.Close()
-	// This test just verifies the client can be created
-	client := NewHomeAssistantClient(server.URL, "test-token")
-	if client == nil {
-		t.Fatal("client is nil")
-	}
-}
-
-// TestMergeEntityID
 func TestMergeEntityID(t *testing.T) {
 	result := mergeEntityID("light.living", map[string]interface{}{"brightness": 128})
 	if result["entity_id"] != "light.living" {
@@ -135,5 +78,57 @@ func TestMergeEntityID(t *testing.T) {
 	}
 	if result["brightness"] != 128 {
 		t.Errorf("expected brightness=128, got %v", result["brightness"])
+	}
+}
+
+func TestDeviceCommand(t *testing.T) {
+	cmd := DeviceCommand{
+		EntityID: "light.living_room",
+		Command:  "on",
+		Params:   map[string]interface{}{"brightness": 255},
+	}
+	if cmd.EntityID != "light.living_room" {
+		t.Errorf("expected entity_id=light.living_room, got %q", cmd.EntityID)
+	}
+	if cmd.Command != "on" {
+		t.Errorf("expected command=on, got %q", cmd.Command)
+	}
+}
+
+func TestBotConfigDefaults(t *testing.T) {
+	bot, err := NewBot(BotConfig{}, nil)
+	if err != nil {
+		t.Fatalf("NewBot: %v", err)
+	}
+	// Should have default entity filters
+	if len(bot.entityFilters) == 0 {
+		t.Error("expected default entity filters")
+	}
+	// Should have default agent bindings
+	if len(bot.agentBindings) == 0 {
+		t.Error("expected default agent bindings")
+	}
+	// Verify some specific defaults
+	found := false
+	for _, f := range bot.entityFilters {
+		if f == "light" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected 'light' in default entity filters")
+	}
+}
+
+func TestMatterToolUnknownCommand(t *testing.T) {
+	ctrl := NewController(ControllerConfig{StorageDir: t.TempDir()})
+	bot := &Bot{
+		controller:    ctrl,
+		entityFilters: []string{"light"},
+	}
+	tool := NewTool(bot)
+	_, err := tool.Execute(context.Background(), "explode light.living_room")
+	if err == nil {
+		t.Error("expected error for unknown command")
 	}
 }

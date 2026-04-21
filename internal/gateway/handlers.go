@@ -38,6 +38,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/tasks/", s.handleTaskByID)
 	mux.HandleFunc("/matter", s.handleMatterDevices)
 	mux.HandleFunc("/matter/", s.handleMatterDevice)
+	mux.HandleFunc("/matter/commission", s.handleMatterCommission)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -192,4 +193,31 @@ func (s *Server) handleMatterDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, entity)
+}
+
+func (s *Server) handleMatterCommission(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.matterBot == nil {
+		writeError(w, http.StatusServiceUnavailable, "matter not configured")
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Code == "" {
+		writeError(w, http.StatusBadRequest, "pairing code required")
+		return
+	}
+	if err := s.matterBot.Commission(r.Context(), req.Code); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }

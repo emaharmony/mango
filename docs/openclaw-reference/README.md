@@ -5,34 +5,43 @@ This directory contains OpenClaw features ported to Mango for reference and adap
 ## What was ported
 
 ### Config (`config/config.yaml`)
-- LLM provider: Ollama with `qwen3.5:cloud`
-- 2 agents: orchestrator, worker
+- Global LLM defaults with env var support (`MANGO_LLM_PROVIDER`, `MANGO_LLM_MODEL`, `MANGO_LLM_BASE_URL`)
+- 2 agents: orchestrator, worker (inherit from LLM defaults)
 - Discord config placeholder
-- Matter (IoT) channel config placeholder
+- Native Matter controller config
 
 ### Agents (`config/agents/`)
-- **ORCHESTRATOR.md** — task decomposition and delegation (Mango default format)
-- **WORKER.md** — general-purpose task worker (Mango default format)
+- **ORCHESTRATOR.md** — task decomposition and delegation
+- **WORKER.md** — general-purpose task worker
 
 ### Skills (`config/skills/`)
 - **weather.md** — wttr.in weather lookups
 - **github.md** — gh CLI operations
-- **matter-iot.md** — Matter/IoT device control via Home Assistant
+- **matter-iot.md** — native Matter/IoT device control
 
 ### Matter Channel (`internal/matter/`)
-- **ha_client.go** — Home Assistant websocket client (auth, state, events)
-- **bot.go** — Matter channel bot (device control, state monitoring, agent dispatch)
+Native Matter controller — no Home Assistant dependency:
+- **controller.go** — Manages matter.js subprocess, JSON stdin/stdout protocol
+- **bot.go** — Channel gateway (device control, state monitoring, agent dispatch)
 - **tool.go** — Agent tool (list, state, on, off, toggle, brightness, temp)
-- **bot_test.go** — 7 passing unit tests
+- **ha_client.go** — Legacy HA client (deprecated, kept for migration)
+- **bot_test.go** — Unit tests
+
+### matter.js Controller (`config/matter/matter-controller.mjs`)
+Node.js subprocess that creates a Matter fabric, commissions devices, and reports state.
+Users never leave Mango — setup, commissioning, and control all happen within the app.
 
 ### Gateway API
 - `GET /matter` → all devices + connection status
 - `GET /matter/<entity_id>` → single device state
+- `POST /matter/commission` → commission a new device with QR/pairing code
 
 ### TUI Dashboard
-- `mango matter dashboard` — Bubble Tea interactive dashboard
+- `mango matter dashboard` — Bubble Tea interactive dashboard (auto-refresh)
 - `mango matter list` — non-interactive device list
 - `mango matter state <id>` — single device detail
+- `mango matter setup` — one-time dependency installation
+- `mango matter commission <code>` — add new Matter device
 
 ## Key differences from OpenClaw
 
@@ -40,24 +49,14 @@ This directory contains OpenClaw features ported to Mango for reference and adap
 |---------|----------|-------|
 | Architecture | Node.js gateway + agents | Go binary + Unix socket |
 | Agent system | Single persistent agent | Multi-agent with orchestrator fan-out |
-| Skills | Rich tool-based skills (shell exec, cron, file ops) | Markdown skill definitions appended to prompts |
+| Skills | Rich tool-based skills | Markdown skill definitions appended to prompts |
 | Channels | Discord, Signal, Telegram, WhatsApp, web UI | Discord + Matter (IoT) + CLI |
-| Memory | Persistent memory (MEMORY.md + semantic search) | SQLite key-value store |
+| Memory | Persistent memory + semantic search | SQLite key-value store |
 | Scheduling | Cron jobs + heartbeats | Not yet implemented |
-| Cost tracking | Built-in per-model cost tracking | Not available |
-| Safety | Approval system for elevated commands | Not available |
 
-## Discord Setup
+## Matter Setup (native, no external app)
 
-Mango needs its **own** Discord bot token (separate from OpenClaw's). See [DISCORD_SETUP.md](../../DISCORD_SETUP.md) for instructions.
-
-## Matter Setup
-
-1. Install Home Assistant with Matter integration
-2. Generate a long-lived access token in HA (Profile → Security)
-3. Add to `config.yaml`:
-   ```yaml
-   matter:
-     url: "http://homeassistant.local:8123"
-     token: "YOUR_HA_LONG_LIVED_ACCESS_TOKEN"
-   ```
+1. `mango matter setup` — installs Node.js + matter-node.js
+2. Enable in config: `matter: { enabled: true }`
+3. Commission devices: `mango matter commission <QR_CODE>`
+4. View: `mango matter dashboard`

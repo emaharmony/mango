@@ -29,6 +29,7 @@ type Server struct {
 type MatterProvider interface {
 	GetDevices() map[string]interface{}
 	GetState(entityID string) (interface{}, bool)
+	Commission(ctx context.Context, code string) error
 }
 
 func NewServer(socketPath string, reg *agent.Registry, runners map[string]*agent.Runner, d *orchestrator.Dispatcher) *Server {

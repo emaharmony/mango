@@ -1,28 +1,47 @@
 # Mango Configuration — Ported from OpenClaw
 
+# Mango Configuration
+#
+# Global defaults (overridable per-agent):
+#   MANGO_LLM_PROVIDER  — default LLM provider (ollama, anthropic, openai-compatible)
+#   MANGO_LLM_MODEL     — default model name
+#   MANGO_LLM_BASE_URL  — default API base URL
+#   MANGO_LLM_API_KEY   — default API key
+#
+# Per-agent overrides take precedence over global defaults.
+
+llm_defaults:
+  provider: ${MANGO_LLM_PROVIDER:-ollama}
+  model: ${MANGO_LLM_MODEL:-qwen3.5:cloud}
+  base_url: ${MANGO_LLM_BASE_URL:-http://localhost:11434/v1}
+  api_key: ${MANGO_LLM_API_KEY:-}
+
 agents:
   - name: orchestrator
     role: orchestrator
     llm:
-      provider: ollama
-      model: qwen3.5:cloud
-      base_url: http://localhost:11434/v1
+      provider: ${MANGO_LLM_PROVIDER:-ollama}
+      model: ${MANGO_LLM_MODEL:-qwen3.5:cloud}
+      base_url: ${MANGO_LLM_BASE_URL:-http://localhost:11434/v1}
 
   - name: worker
     skills: [weather, github]
     llm:
-      provider: ollama
-      model: qwen3.5:cloud
-      base_url: http://localhost:11434/v1
+      provider: ${MANGO_LLM_PROVIDER:-ollama}
+      model: ${MANGO_LLM_MODEL:-qwen3.5:cloud}
+      base_url: ${MANGO_LLM_BASE_URL:-http://localhost:11434/v1}
 
 # Discord integration — requires a SEPARATE bot token
 # discord:
 #   token: "YOUR_MANGO_DISCORD_BOT_TOKEN"
 
-# Matter (IoT) channel — connects to Home Assistant for smart device control
+# Matter (IoT) — native controller (no external app needed)
+# Run `mango matter setup` to install dependencies and configure
 # matter:
-#   url: "http://homeassistant.local:8123"
-#   token: "YOUR_HA_LONG_LIVED_ACCESS_TOKEN"
+#   enabled: true
+#   node_path: node
+#   storage_dir: ~/.mango/matter
+#   port: 5540
 #   entity_filters: ["light", "switch", "sensor", "lock", "climate"]
 #   agent_bindings:
 #     light: worker

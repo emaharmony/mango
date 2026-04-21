@@ -299,7 +299,7 @@ func newMatterDashboardCmd() *cobra.Command {
 
 func newMatterCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "matter", Short: "Manage Matter/IoT devices"}
-	cmd.AddCommand(newMatterDashboardCmd(), newMatterListCmd(), newMatterStateCmd())
+	cmd.AddCommand(newMatterDashboardCmd(), newMatterListCmd(), newMatterStateCmd(), newMatterSetupCmd(), newMatterCommissionCmd())
 	return cmd
 }
 

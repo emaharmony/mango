@@ -154,12 +154,17 @@ func runServe(parent context.Context, cfg *Config) error {
 	}
 
 	// Start Matter (IoT) channel if configured
-	if cfg.Matter.URL != "" && cfg.Matter.Token != "" {
+	if cfg.Matter.Enabled {
 		matterBot, err := matter.NewBot(matter.BotConfig{
-			URL:           cfg.Matter.URL,
-			Token:         cfg.Matter.Token,
-			EntityFilters: cfg.Matter.EntityFilters,
-			AgentBindings: cfg.Matter.AgentBindings,
+			Controller: matter.ControllerConfig{
+				Enabled:          cfg.Matter.Enabled,
+				NodePath:         cfg.Matter.NodePath,
+				StorageDir:       cfg.Matter.StorageDir,
+				NetworkInterface: cfg.Matter.NetworkInterface,
+				Port:             cfg.Matter.Port,
+			},
+			EntityFilters:  cfg.Matter.EntityFilters,
+			AgentBindings:  cfg.Matter.AgentBindings,
 		}, dispatcher)
 		if err != nil {
 			return fmt.Errorf("matter: %w", err)
