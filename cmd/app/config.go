@@ -38,9 +38,17 @@ type DiscordConfig struct {
 	Global bool   `mapstructure:"global" yaml:"global,omitempty"`
 }
 
+type MatterConfig struct {
+	URL           string            `mapstructure:"url" yaml:"url,omitempty"`
+	Token         string            `mapstructure:"token" yaml:"token,omitempty"`
+	EntityFilters []string          `mapstructure:"entity_filters" yaml:"entity_filters,omitempty"`
+	AgentBindings map[string]string `mapstructure:"agent_bindings" yaml:"agent_bindings,omitempty"`
+}
+
 type Config struct {
 	SocketPath string          `mapstructure:"socket_path" yaml:"socket_path,omitempty"`
 	Discord    DiscordConfig   `mapstructure:"discord" yaml:"discord,omitempty"`
+	Matter     MatterConfig    `mapstructure:"matter" yaml:"matter,omitempty"`
 	Agents     []AgentConfig   `mapstructure:"agents" yaml:"agents,omitempty"`
 	Bindings   []BindingConfig `mapstructure:"bindings" yaml:"bindings,omitempty"`
 
@@ -122,6 +130,8 @@ func loadConfig(path string) (*Config, error) {
 func expandConfig(cfg *Config) {
 	cfg.SocketPath = os.ExpandEnv(cfg.SocketPath)
 	cfg.Discord.Token = os.ExpandEnv(cfg.Discord.Token)
+	cfg.Matter.URL = os.ExpandEnv(cfg.Matter.URL)
+	cfg.Matter.Token = os.ExpandEnv(cfg.Matter.Token)
 	for i := range cfg.Agents {
 		a := &cfg.Agents[i]
 		a.WorkDir = os.ExpandEnv(a.WorkDir)

@@ -27,3 +27,13 @@ agents:
 # Create a new Discord app at https://discord.com/developers/applications
 # discord:
 #   token: "YOUR_MANGO_DISCORD_BOT_TOKEN"
+
+# Matter (IoT) channel — connects to Home Assistant for smart device control
+# Requires Home Assistant with Matter integration enabled
+# matter:
+#   url: "http://homeassistant.local:8123"
+#   token: "YOUR_HA_LONG_LIVED_ACCESS_TOKEN"
+#   entity_filters: ["light", "switch", "sensor", "lock", "climate"]
+#   agent_bindings:
+#     light: worker
+#     lock: worker

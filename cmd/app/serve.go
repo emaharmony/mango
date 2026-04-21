@@ -18,6 +18,7 @@ import (
 	"github.com/carlosmaranje/mango/internal/llm"
 	"github.com/carlosmaranje/mango/internal/memory"
 	"github.com/carlosmaranje/mango/internal/orchestrator"
+	"github.com/carlosmaranje/mango/internal/matter"
 	"github.com/carlosmaranje/mango/internal/skill"
 	"github.com/carlosmaranje/mango/internal/tools"
 )
@@ -150,6 +151,36 @@ func runServe(parent context.Context, cfg *Config) error {
 		}
 	} else {
 		log.Printf("discord: no token configured, skipping")
+	}
+
+	// Start Matter (IoT) channel if configured
+	if cfg.Matter.URL != "" && cfg.Matter.Token != "" {
+		matterBot, err := matter.NewBot(matter.BotConfig{
+			URL:           cfg.Matter.URL,
+			Token:         cfg.Matter.Token,
+			EntityFilters: cfg.Matter.EntityFilters,
+			AgentBindings: cfg.Matter.AgentBindings,
+		}, dispatcher)
+		if err != nil {
+			return fmt.Errorf("matter: %w", err)
+		}
+		if err := matterBot.Start(ctx); err != nil {
+			return fmt.Errorf("matter start: %w", err)
+		}
+
+		// Register Matter as an agent tool
+		matterTool := matter.NewTool(matterBot)
+		if err := toolReg.Register(matterTool); err != nil {
+			return fmt.Errorf("register matter tool: %w", err)
+		}
+
+		defer func() {
+			if err := matterBot.Close(); err != nil {
+				log.Printf("matter: close: %v", err)
+			}
+		}()
+	} else {
+		log.Printf("matter: no Home Assistant configured, skipping")
 	}
 
 	<-ctx.Done()
