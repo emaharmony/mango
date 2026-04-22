@@ -53,6 +53,8 @@ func runServe(parent context.Context, cfg *Config) error {
 	if err := toolReg.Register(tools.NewGoSolarTool()); err != nil {
 		return fmt.Errorf("failed to register gosolar tool: %w", err)
 	}
+	// Memory search and recall tools are available to all agents
+	// (they'll be registered per-agent below with the agent's memory store)
 
 	var orchestratorAgent *agent.Agent
 
@@ -99,6 +101,29 @@ func runServe(parent context.Context, cfg *Config) error {
 			Memory:       mem,
 			Session:      agent.NewSessionStore(),
 			AuthCreds:    ac.AuthCreds,
+		}
+
+		// Register memory tools for this agent
+		// All agents get search and recall (read-only)
+		memSearch := tools.NewMemorySearchTool(mem)
+		memRecall := tools.NewMemoryRecallTool(mem)
+		if err := toolReg.Register(memSearch); err != nil {
+			return fmt.Errorf("agent %q: register memory_search: %w", ac.Name, err)
+		}
+		if err := toolReg.Register(memRecall); err != nil {
+			return fmt.Errorf("agent %q: register memory_recall: %w", ac.Name, err)
+		}
+
+		// Manager agents also get store and config (write access)
+		if ac.Role == "orchestrator" || ac.Role == "manager" {
+			memStore := tools.NewMemoryStoreTool(mem)
+			memConfig := tools.NewMemoryConfigTool(mem)
+			if err := toolReg.Register(memStore); err != nil {
+				return fmt.Errorf("agent %q: register memory_store: %w", ac.Name, err)
+			}
+			if err := toolReg.Register(memConfig); err != nil {
+				return fmt.Errorf("agent %q: register memory_config: %w", ac.Name, err)
+			}
 		}
 		if err := registry.Register(a); err != nil {
 			return err
