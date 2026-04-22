@@ -193,7 +193,6 @@ func TestMemoryStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
 
 	s.StoreMemory("Persistent one", "project", []string{"test"}, "persistent")
 	s.StoreMemory("Active one", "conversation", []string{"test"}, "active")
@@ -201,13 +200,14 @@ func TestMemoryStats(t *testing.T) {
 
 	stats, err := s.Stats()
 	if err != nil {
+		s.Close()
 		t.Fatal(err)
 	}
+	s.Close() // Close before assertions to stop decay goroutine
+
 	if stats.Total != 3 {
 		t.Errorf("expected total=3, got %d", stats.Total)
 	}
-	// Note: Recall in promote test may bump reference counts,
-	// but each test uses a separate DB so tier counts should be accurate
 	if stats.TierCounts["persistent"] < 1 {
 		t.Errorf("expected persistent>=1, got %d", stats.TierCounts["persistent"])
 	}

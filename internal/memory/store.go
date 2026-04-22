@@ -1,7 +1,9 @@
 package memory
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -508,10 +510,8 @@ func (s *sqliteStore) getConfigLocked(key string) (string, error) {
 
 func randomHex(n int) string {
 	b := make([]byte, n)
-	for i := range b {
-		b[i] = "0123456789abcdef"[time.Now().UnixNano()%16]
-	}
-	return fmt.Sprintf("%x", b)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // ReadOnlyStore wraps a Store for non-manager agents.

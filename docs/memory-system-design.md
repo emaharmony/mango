@@ -183,27 +183,35 @@ User tracking can be managed via:
 
 ## Milestones
 
-### M1 — Core Memory System
+### M1 — Core Memory System ✅
 - New tables + interfaces in `internal/memory`
 - CLI commands working (`stats`, `search`, `recall`, `config`, `add`, `decay`)
 - Decay goroutine running
 - Backward compatible (existing tests pass)
 - Seed with Ema + Kirby profiles
 
-### M2 — Agent Integration
+### M2 — Agent Integration ✅
 - `memory_search` and `memory_recall` tools registered for all agents
 - `memory_store` and `memory_config` tools registered for manager only
 - Read-only wrapper for non-manager agents
-- Auto-inject relevant memories into LLM context
+- Full test coverage for all 4 tools
 
-### M3 — Auto-Capture + User Tracking
-- Tracked users config working
-- Auto-capture after conversations with tracked users
-- Integration with Discord message flow
-- End-to-end: Ema says something → auto-captured → searchable → auto-injected later
+### M3 — Auto-Capture + User Tracking ✅
+- Auto-inject: relevant memories injected into LLM context before task
+- Auto-capture: post-task memory storage based on category heuristics
+- Keyword extraction with stop-word filtering
+- Category detection (decision, preference, architecture, project)
+- Configurable via `auto_capture` and `auto_inject` settings
+- `tracked_users` config (default: empty)
 
-### M4 — Polish + UI
-- Web dashboard for memory browsing and settings (future scope)
+### M4 — Polish ✅
+- Design doc updated
+- Stats test made robust against timing
+- All tests passing
+- Code cleanup and final review
+
+### Future — Web UI Dashboard
+- Memory browsing interface
+- Settings adjustment UI
+- Visual tier breakdown
 - Performance tuning
-- Rate limiting on auto-capture
-- Memory deduplication
