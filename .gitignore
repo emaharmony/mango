@@ -27,3 +27,10 @@ go.work.sum
 .env
 .junie
 .idea
+
+# Local agent definitions (use .template.md for repo)
+config/agents/ORCHESTRATOR.md
+config/agents/WORKER.md
+
+# Local config with secrets
+config/config.yaml
