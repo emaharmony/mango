@@ -32,6 +32,7 @@ type Runner struct {
 	Agent    *Agent
 	Interval time.Duration
 	toolReg  *tools.Registry
+	safety   *SafetyChecker
 
 	taskCh chan TaskEnvelope
 
@@ -49,6 +50,7 @@ func NewRunner(a *Agent, toolReg *tools.Registry, interval time.Duration) *Runne
 		Agent:    a,
 		Interval: interval,
 		toolReg:  toolReg,
+		safety:   NewSafetyChecker(),
 		taskCh:   make(chan TaskEnvelope, 64),
 	}
 }
@@ -206,6 +208,19 @@ func (r *Runner) invokeLLM(ctx context.Context, goal string, history []llm.Messa
 		})
 		for _, tc := range resp.ToolCalls {
 			log.Printf("agent %q: step %d — tool call %q input=%s", r.Agent.Name, step, tc.Name, tc.Input)
+
+			// Safety check before executing the tool
+			if err := r.safety.Check(r.Agent.Name, tc.Name, tc.Input); err != nil {
+				log.Printf("agent %q: step %d — tool %q blocked by safety: %v", r.Agent.Name, step, tc.Name, err)
+				messages = append(messages, llm.Message{
+					Role:       "tool",
+					ToolCallID: tc.ID,
+					Name:       tc.Name,
+					Content:    "blocked: " + err.Error(),
+				})
+				continue
+			}
+
 			result, execErr := r.toolReg.Execute(ctx, tc.Name, tc.Input)
 			msg := llm.Message{
 				Role:       "tool",
