@@ -139,6 +139,49 @@ func (b *Bot) SetTemperature(ctx context.Context, entityID string, temp float64)
 	})
 }
 
+// AddDevice registers a new entity for monitoring by adding its domain to the filter list.
+func (b *Bot) AddDevice(ctx context.Context, entityID, friendlyName string) error {
+	domain := domainFromEntity(entityID)
+	b.mu.Lock()
+	// Ensure domain is in entity filters
+	found := false
+	for _, f := range b.entityFilters {
+		if f == domain {
+			found = true
+			break
+		}
+	}
+	if !found {
+		b.entityFilters = append(b.entityFilters, domain)
+		log.Printf("matter: added domain %q to entity filters", domain)
+	}
+	b.mu.Unlock()
+
+	// Request the controller to subscribe/watch this entity
+	return b.controller.SendDeviceCommand(ctx, DeviceCommand{
+		EntityID: entityID,
+		Command:  "subscribe",
+		Params:   map[string]interface{}{"friendly_name": friendlyName},
+	})
+}
+
+// RemoveDevice removes an entity from monitoring.
+func (b *Bot) RemoveDevice(ctx context.Context, entityID string) error {
+	return b.controller.SendDeviceCommand(ctx, DeviceCommand{
+		EntityID: entityID,
+		Command:  "unsubscribe",
+	})
+}
+
+// CallService sends an arbitrary service call to a device via the controller.
+func (b *Bot) CallService(ctx context.Context, domain, service, entityID string, payload map[string]interface{}) error {
+	return b.controller.SendDeviceCommand(ctx, DeviceCommand{
+		EntityID: entityID,
+		Command:  domain + "." + service,
+		Params:   payload,
+	})
+}
+
 // GetDevices returns all Matter devices (implements gateway.MatterProvider).
 func (b *Bot) GetDevices() map[string]interface{} {
 	return b.controller.GetDevices()

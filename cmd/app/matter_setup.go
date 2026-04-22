@@ -130,6 +130,12 @@ func newMatterCommissionCmd() *cobra.Command {
 	}
 }
 
+func newMatterCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "matter", Short: "Manage Matter/IoT devices"}
+	cmd.AddCommand(newMatterSetupCmd(), newMatterCommissionCmd())
+	return cmd
+}
+
 func generateDefaultScript(path string) {
 	// Minimal fallback script that just logs and communicates with Mango
 	script := `#!/usr/bin/env node

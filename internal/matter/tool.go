@@ -2,6 +2,7 @@ package matter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -26,15 +27,18 @@ func (t *Tool) Name() string {
 
 // Description returns a human-readable description.
 func (t *Tool) Description() string {
-	return "Control Matter/IoT devices via Home Assistant. Commands: list, state <entity_id>, on <entity_id>, off <entity_id>, toggle <entity_id>, brightness <entity_id> <0-255>, temp <entity_id> <value>"
+	return "Control Matter/IoT devices via Home Assistant. Commands: list, state <entity_id>, on <entity_id>, off <entity_id>, toggle <entity_id>, brightness <entity_id> <0-255>, temp <entity_id> <value>, add <entity_id> [friendly_name], remove <entity_id>, signal <entity_id> <service> [payload]"
 }
 
 // Parameters returns tool parameter definitions.
 func (t *Tool) Parameters() []tools.Parameter {
 	return []tools.Parameter{
-		{Name: "command", Type: "string", Description: "One of: list, state, on, off, toggle, brightness, temp", Required: true},
+		{Name: "command", Type: "string", Description: "One of: list, state, on, off, toggle, brightness, temp, add, remove, signal", Required: true},
 		{Name: "entity_id", Type: "string", Description: "Home Assistant entity ID (e.g., light.living_room)", Required: false},
 		{Name: "value", Type: "string", Description: "Value for brightness (0-255) or temperature", Required: false},
+		{Name: "friendly_name", Type: "string", Description: "Friendly name for add command", Required: false},
+		{Name: "service", Type: "string", Description: "Service call for signal command (e.g., cover.close, lock.lock)", Required: false},
+		{Name: "payload", Type: "string", Description: "JSON payload for signal command", Required: false},
 	}
 }
 
@@ -115,8 +119,53 @@ func (t *Tool) Execute(ctx context.Context, input string) (string, error) {
 		}
 		return fmt.Sprintf("✅ Set %s temperature to %.1f", parts[1], temp), nil
 
+	case "add":
+		if len(parts) < 2 {
+			return "", fmt.Errorf("usage: add <entity_id> [friendly_name]")
+		}
+		friendlyName := ""
+		if len(parts) > 2 {
+			friendlyName = strings.Join(parts[2:], " ")
+		}
+		if err := t.bot.AddDevice(ctx, parts[1], friendlyName); err != nil {
+			return "", fmt.Errorf("add device %s: %w", parts[1], err)
+		}
+		label := parts[1]
+		if friendlyName != "" {
+			label = fmt.Sprintf("%s (%s)", parts[1], friendlyName)
+		}
+		return fmt.Sprintf("✅ Added %s for monitoring", label), nil
+
+	case "remove":
+		if len(parts) < 2 {
+			return "", fmt.Errorf("usage: remove <entity_id>")
+		}
+		if err := t.bot.RemoveDevice(ctx, parts[1]); err != nil {
+			return "", fmt.Errorf("remove device %s: %w", parts[1], err)
+		}
+		return fmt.Sprintf("✅ Removed %s from monitoring", parts[1]), nil
+
+	case "signal":
+		if len(parts) < 3 {
+			return "", fmt.Errorf("usage: signal <entity_id> <service> [payload]")
+		}
+		serviceParts := strings.SplitN(parts[2], ".", 2)
+		if len(serviceParts) != 2 {
+			return "", fmt.Errorf("service must be in domain.service format (e.g., cover.close)")
+		}
+		var payload map[string]interface{}
+		if len(parts) > 3 {
+			if err := json.Unmarshal([]byte(strings.Join(parts[3:], " ")), &payload); err != nil {
+				return "", fmt.Errorf("invalid JSON payload: %w", err)
+			}
+		}
+		if err := t.bot.CallService(ctx, serviceParts[0], serviceParts[1], parts[1], payload); err != nil {
+			return "", fmt.Errorf("signal %s %s: %w", parts[2], parts[1], err)
+		}
+		return fmt.Sprintf("✅ Sent %s to %s", parts[2], parts[1]), nil
+
 	default:
-		return "", fmt.Errorf("unknown command: %s. Commands: list, state, on, off, toggle, brightness, temp", cmd)
+		return "", fmt.Errorf("unknown command: %s. Commands: list, state, on, off, toggle, brightness, temp, add, remove, signal", cmd)
 	}
 }
 
