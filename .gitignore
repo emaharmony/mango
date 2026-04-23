@@ -34,4 +34,4 @@ config/agents/WORKER.md
 
 # Local config with secrets
 config/config.yaml.DS_Store
-app
+/app

@@ -146,7 +146,7 @@ func runServe(parent context.Context, cfg *Config) error {
 	if orchestratorAgent != nil {
 		orch = orchestrator.NewOrchestrator(orchestratorAgent, registry)
 	}
-	dispatcher := orchestrator.NewDispatcher(registry, runners, orch)
+	dispatcher := orchestrator.NewDispatcher(registry, runners, toolReg, orch)
 
 	gw := gateway.NewServer(cfg.SocketPath, registry, runners, dispatcher)
 	if err := gw.Start(ctx); err != nil {
