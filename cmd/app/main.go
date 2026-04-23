@@ -33,6 +33,9 @@ func main() {
 		newAgentCmd(),
 		newTaskCmd(),
 		newConfigCmd(),
+		newMatterCmd(),
+		newMemoryCmd(),
+		newSafetyCmd(),
 	)
 
 	if err := root.ExecuteContext(ctx); err != nil {

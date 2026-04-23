@@ -18,6 +18,7 @@ import (
 	"github.com/carlosmaranje/mango/internal/llm"
 	"github.com/carlosmaranje/mango/internal/memory"
 	"github.com/carlosmaranje/mango/internal/orchestrator"
+	"github.com/carlosmaranje/mango/internal/matter"
 	"github.com/carlosmaranje/mango/internal/skill"
 	"github.com/carlosmaranje/mango/internal/tools"
 )
@@ -52,6 +53,8 @@ func runServe(parent context.Context, cfg *Config) error {
 	if err := toolReg.Register(tools.NewGoSolarTool()); err != nil {
 		return fmt.Errorf("failed to register gosolar tool: %w", err)
 	}
+	// Memory search and recall tools are available to all agents
+	// (they'll be registered per-agent below with the agent's memory store)
 
 	var orchestratorAgent *agent.Agent
 
@@ -99,6 +102,29 @@ func runServe(parent context.Context, cfg *Config) error {
 			Session:      agent.NewSessionStore(),
 			AuthCreds:    ac.AuthCreds,
 		}
+
+		// Register memory tools for this agent
+		// All agents get search and recall (read-only)
+		memSearch := tools.NewMemorySearchTool(mem)
+		memRecall := tools.NewMemoryRecallTool(mem)
+		if err := toolReg.Register(memSearch); err != nil {
+			return fmt.Errorf("agent %q: register memory_search: %w", ac.Name, err)
+		}
+		if err := toolReg.Register(memRecall); err != nil {
+			return fmt.Errorf("agent %q: register memory_recall: %w", ac.Name, err)
+		}
+
+		// Manager agents also get store and config (write access)
+		if ac.Role == "orchestrator" || ac.Role == "manager" {
+			memStore := tools.NewMemoryStoreTool(mem)
+			memConfig := tools.NewMemoryConfigTool(mem)
+			if err := toolReg.Register(memStore); err != nil {
+				return fmt.Errorf("agent %q: register memory_store: %w", ac.Name, err)
+			}
+			if err := toolReg.Register(memConfig); err != nil {
+				return fmt.Errorf("agent %q: register memory_config: %w", ac.Name, err)
+			}
+		}
 		if err := registry.Register(a); err != nil {
 			return err
 		}
@@ -120,7 +146,7 @@ func runServe(parent context.Context, cfg *Config) error {
 	if orchestratorAgent != nil {
 		orch = orchestrator.NewOrchestrator(orchestratorAgent, registry)
 	}
-	dispatcher := orchestrator.NewDispatcher(registry, runners, orch)
+	dispatcher := orchestrator.NewDispatcher(registry, runners, toolReg, orch)
 
 	gw := gateway.NewServer(cfg.SocketPath, registry, runners, dispatcher)
 	if err := gw.Start(ctx); err != nil {
@@ -150,6 +176,44 @@ func runServe(parent context.Context, cfg *Config) error {
 		}
 	} else {
 		log.Printf("discord: no token configured, skipping")
+	}
+
+	// Start Matter (IoT) channel if configured
+	if cfg.Matter.Enabled {
+		matterBot, err := matter.NewBot(matter.BotConfig{
+			Controller: matter.ControllerConfig{
+				Enabled:          cfg.Matter.Enabled,
+				NodePath:         cfg.Matter.NodePath,
+				StorageDir:       cfg.Matter.StorageDir,
+				NetworkInterface: cfg.Matter.NetworkInterface,
+				Port:             cfg.Matter.Port,
+			},
+			EntityFilters:  cfg.Matter.EntityFilters,
+			AgentBindings:  cfg.Matter.AgentBindings,
+		}, dispatcher)
+		if err != nil {
+			return fmt.Errorf("matter: %w", err)
+		}
+		if err := matterBot.Start(ctx); err != nil {
+			return fmt.Errorf("matter start: %w", err)
+		}
+
+	// Register Matter as an agent tool
+		matterTool := matter.NewTool(matterBot)
+		if err := toolReg.Register(matterTool); err != nil {
+			return fmt.Errorf("register matter tool: %w", err)
+		}
+
+		// Wire Matter into gateway for /matter endpoints
+		gw.SetMatterBot(matterBot)
+
+		defer func() {
+			if err := matterBot.Close(); err != nil {
+				log.Printf("matter: close: %v", err)
+			}
+		}()
+	} else {
+		log.Printf("matter: no Home Assistant configured, skipping")
 	}
 
 	<-ctx.Done()

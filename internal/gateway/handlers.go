@@ -36,6 +36,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/agents/stop", s.handleAgentStop)
 	mux.HandleFunc("/tasks", s.handleTasks)
 	mux.HandleFunc("/tasks/", s.handleTaskByID)
+	mux.HandleFunc("/matter", s.handleMatterDevices)
+	mux.HandleFunc("/matter/", s.handleMatterDevice)
+	mux.HandleFunc("/matter/commission", s.handleMatterCommission)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
@@ -155,4 +158,66 @@ func (s *Server) handleTaskByID(w http.ResponseWriter, r *http.Request) {
 		Result: task.Result,
 		Error:  task.Error,
 	})
+}
+
+func (s *Server) handleMatterDevices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.matterBot == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"connected": false, "devices": []any{}})
+		return
+	}
+	devices := s.matterBot.GetDevices()
+	writeJSON(w, http.StatusOK, map[string]any{"connected": true, "devices": devices})
+}
+
+func (s *Server) handleMatterDevice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	entityID := strings.TrimPrefix(r.URL.Path, "/matter/")
+	if entityID == "" {
+		writeError(w, http.StatusBadRequest, "entity id required")
+		return
+	}
+	if s.matterBot == nil {
+		writeError(w, http.StatusServiceUnavailable, "matter not configured")
+		return
+	}
+	entity, ok := s.matterBot.GetState(entityID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "entity not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, entity)
+}
+
+func (s *Server) handleMatterCommission(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.matterBot == nil {
+		writeError(w, http.StatusServiceUnavailable, "matter not configured")
+		return
+	}
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Code == "" {
+		writeError(w, http.StatusBadRequest, "pairing code required")
+		return
+	}
+	if err := s.matterBot.Commission(r.Context(), req.Code); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
 }

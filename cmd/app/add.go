@@ -258,6 +258,8 @@ func providerBaseURLHint(provider string) string {
 		return "https://api.anthropic.com"
 	case "ollama":
 		return "http://localhost:11434/v1"
+	case "openai-compatible":
+		return ""
 	default:
 		return ""
 	}

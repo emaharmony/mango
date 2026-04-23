@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -24,6 +25,9 @@ type Bot struct {
 	history    *ChannelHistory
 	dispatcher *orchestrator.Dispatcher
 	global     bool
+
+	mu         sync.Mutex
+	processing map[string]bool // message ID dedup
 }
 
 func NewBot(token string, router *Router, history *ChannelHistory, dispatcher *orchestrator.Dispatcher, global bool) (*Bot, error) {
@@ -39,6 +43,7 @@ func NewBot(token string, router *Router, history *ChannelHistory, dispatcher *o
 		history:    history,
 		dispatcher: dispatcher,
 		global:     global,
+		processing: make(map[string]bool),
 	}
 	sess.AddHandler(b.onMessage)
 	sess.AddHandler(b.onReady)
@@ -86,6 +91,23 @@ func (b *Bot) onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
 	}
+
+	// Deduplicate: skip if we're already processing this message
+	b.mu.Lock()
+	if b.processing[m.ID] {
+		b.mu.Unlock()
+		return
+	}
+	b.processing[m.ID] = true
+	b.mu.Unlock()
+
+	// Clean up old entries periodically (keep map from growing unbounded)
+	go func() {
+		time.Sleep(5 * time.Minute)
+		b.mu.Lock()
+		delete(b.processing, m.ID)
+		b.mu.Unlock()
+	}()
 
 	isDM := m.GuildID == ""
 	isMentioned := false

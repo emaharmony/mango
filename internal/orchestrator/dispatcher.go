@@ -5,16 +5,19 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
 	"github.com/carlosmaranje/mango/internal/agent"
 	"github.com/carlosmaranje/mango/internal/llm"
+	"github.com/carlosmaranje/mango/internal/tools"
 )
 
 type Dispatcher struct {
 	registry *agent.Registry
 	runners  map[string]*agent.Runner
+	toolReg  *tools.Registry
 
 	mu    sync.RWMutex
 	tasks map[string]*Task
@@ -22,10 +25,11 @@ type Dispatcher struct {
 	orchestrator *Orchestrator
 }
 
-func NewDispatcher(reg *agent.Registry, runners map[string]*agent.Runner, orch *Orchestrator) *Dispatcher {
+func NewDispatcher(reg *agent.Registry, runners map[string]*agent.Runner, toolReg *tools.Registry, orch *Orchestrator) *Dispatcher {
 	return &Dispatcher{
 		registry:     reg,
 		runners:      runners,
+		toolReg:      toolReg,
 		tasks:        make(map[string]*Task),
 		orchestrator: orch,
 	}
@@ -109,6 +113,18 @@ func (d *Dispatcher) RunOnAgent(ctx context.Context, agentName, goal string, jso
 }
 
 func (d *Dispatcher) RunOnAgentWithHistory(ctx context.Context, agentName, goal string, history []llm.Message, jsonResponse bool) (string, error) {
+	// Check if agentName matches a tool — fall back to tool registry
+	if d.toolReg != nil {
+		if t, ok := d.toolReg.Get(agentName); ok {
+			result, err := t.Execute(ctx, goal)
+			if err != nil {
+				return "", fmt.Errorf("tool %q execution failed: %w", agentName, err)
+			}
+			log.Printf("dispatcher: tool %q executed as fallback for agent %q", t.Name(), agentName)
+			return result, nil
+		}
+	}
+
 	runner, ok := d.runners[agentName]
 	if !ok {
 		return "", fmt.Errorf("no runner registered for agent %q", agentName)

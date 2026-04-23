@@ -38,11 +38,30 @@ type DiscordConfig struct {
 	Global bool   `mapstructure:"global" yaml:"global,omitempty"`
 }
 
+type LLMDefaultsConfig struct {
+	Provider string `mapstructure:"provider" yaml:"provider,omitempty"`
+	Model    string `mapstructure:"model" yaml:"model,omitempty"`
+	APIKey   string `mapstructure:"api_key" yaml:"api_key,omitempty"`
+	BaseURL  string `mapstructure:"base_url" yaml:"base_url,omitempty"`
+}
+
+type MatterConfig struct {
+	Enabled        bool              `mapstructure:"enabled" yaml:"enabled,omitempty"`
+	NodePath       string            `mapstructure:"node_path" yaml:"node_path,omitempty"`
+	StorageDir     string            `mapstructure:"storage_dir" yaml:"storage_dir,omitempty"`
+	NetworkInterface string          `mapstructure:"network_interface" yaml:"network_interface,omitempty"`
+	Port           int               `mapstructure:"port" yaml:"port,omitempty"`
+	EntityFilters  []string          `mapstructure:"entity_filters" yaml:"entity_filters,omitempty"`
+	AgentBindings  map[string]string `mapstructure:"agent_bindings" yaml:"agent_bindings,omitempty"`
+}
+
 type Config struct {
-	SocketPath string          `mapstructure:"socket_path" yaml:"socket_path,omitempty"`
-	Discord    DiscordConfig   `mapstructure:"discord" yaml:"discord,omitempty"`
-	Agents     []AgentConfig   `mapstructure:"agents" yaml:"agents,omitempty"`
-	Bindings   []BindingConfig `mapstructure:"bindings" yaml:"bindings,omitempty"`
+	SocketPath  string             `mapstructure:"socket_path" yaml:"socket_path,omitempty"`
+	Discord     DiscordConfig      `mapstructure:"discord" yaml:"discord,omitempty"`
+	Matter      MatterConfig       `mapstructure:"matter" yaml:"matter,omitempty"`
+	LLMDefaults LLMDefaultsConfig  `mapstructure:"llm_defaults" yaml:"llm_defaults,omitempty"`
+	Agents     []AgentConfig      `mapstructure:"agents" yaml:"agents,omitempty"`
+	Bindings   []BindingConfig    `mapstructure:"bindings" yaml:"bindings,omitempty"`
 
 	ConfigDir string `mapstructure:"-" yaml:"-"`
 }
@@ -122,8 +141,34 @@ func loadConfig(path string) (*Config, error) {
 func expandConfig(cfg *Config) {
 	cfg.SocketPath = os.ExpandEnv(cfg.SocketPath)
 	cfg.Discord.Token = os.ExpandEnv(cfg.Discord.Token)
+
+	// Expand LLM defaults
+	cfg.LLMDefaults.Provider = os.ExpandEnv(cfg.LLMDefaults.Provider)
+	cfg.LLMDefaults.Model = os.ExpandEnv(cfg.LLMDefaults.Model)
+	cfg.LLMDefaults.APIKey = os.ExpandEnv(cfg.LLMDefaults.APIKey)
+	cfg.LLMDefaults.BaseURL = os.ExpandEnv(cfg.LLMDefaults.BaseURL)
+
+	// Expand Matter config
+	cfg.Matter.NodePath = os.ExpandEnv(cfg.Matter.NodePath)
+	cfg.Matter.StorageDir = os.ExpandEnv(cfg.Matter.StorageDir)
+	cfg.Matter.NetworkInterface = os.ExpandEnv(cfg.Matter.NetworkInterface)
+
+	// Apply defaults to agents that don't override
 	for i := range cfg.Agents {
 		a := &cfg.Agents[i]
+		if a.LLM.Provider == "" {
+			a.LLM.Provider = cfg.LLMDefaults.Provider
+		}
+		if a.LLM.Model == "" {
+			a.LLM.Model = cfg.LLMDefaults.Model
+		}
+		if a.LLM.APIKey == "" {
+			a.LLM.APIKey = cfg.LLMDefaults.APIKey
+		}
+		if a.LLM.BaseURL == "" {
+			a.LLM.BaseURL = cfg.LLMDefaults.BaseURL
+		}
+
 		a.WorkDir = os.ExpandEnv(a.WorkDir)
 		a.LLM.APIKey = os.ExpandEnv(a.LLM.APIKey)
 		a.LLM.BaseURL = os.ExpandEnv(a.LLM.BaseURL)

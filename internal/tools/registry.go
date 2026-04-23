@@ -21,7 +21,7 @@ func (r *Registry) Register(t Tool) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.tools[t.Name()]; exists {
-		return fmt.Errorf("tool %q already registered", t.Name())
+		return nil // already registered, skip
 	}
 	r.tools[t.Name()] = t
 	return nil
